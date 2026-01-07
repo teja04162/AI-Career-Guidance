@@ -103,3 +103,6 @@ def predict():
         "explanation": explanation,
         "resume_tips": tips
     })
+@app.route("/", methods=["GET"])
+def home():
+    return {"status": "AI Career Guidance Backend is running 🚀"}
