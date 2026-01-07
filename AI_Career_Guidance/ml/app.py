@@ -6,7 +6,9 @@ import fitz  # PyMuPDF
 app = Flask(__name__)
 CORS(app)
 
+# -----------------------------
 # Load ML model
+# -----------------------------
 model = joblib.load("model.pkl")
 
 SKILLS = [
@@ -21,7 +23,6 @@ SKILLS = [
 def extract_skills(pdf_file):
     doc = fitz.open(stream=pdf_file.read(), filetype="pdf")
     text = " ".join(page.get_text().lower() for page in doc)
-
     found_skills = [skill for skill in SKILLS if skill in text]
     return found_skills, len(found_skills)
 
@@ -41,7 +42,7 @@ def suggest_role(skills):
         return "General IT Roles"
 
 # -----------------------------
-# ✅ Resume Improvement Tips
+# Resume Improvement Tips
 # -----------------------------
 def resume_tips(skill_score, career):
     tips = []
@@ -91,7 +92,6 @@ def predict():
         career = "Higher Studies / Govt Exams"
         explanation = "Focus on fundamentals and long-term preparation."
 
-    # ✅ Generate resume tips
     tips = resume_tips(skill_score, career)
 
     return jsonify({
@@ -101,8 +101,5 @@ def predict():
         "skill_score": skill_score,
         "skills_found": resume_skills,
         "explanation": explanation,
-        "resume_tips": tips   # 🔥 NEW
+        "resume_tips": tips
     })
-
-if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5001)
