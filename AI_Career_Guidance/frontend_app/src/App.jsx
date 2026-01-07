@@ -8,26 +8,31 @@ function App() {
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
 
-  const analyzeCareer = async (formData) => {
+ const analyzeCareer = async (formData) => {
   try {
-    setResult(null);     // 🔄 Clear previous dashboard
-    setLoading(true);    // ⏳ Show AI loading skeleton
+    setResult(null);
+    setLoading(true);
 
-    const res = await fetch("http://127.0.0.1:5001/predict", {
-      method: "POST",
-      body: formData,
-    });
+    const res = await fetch(
+      "https://ai-career-guidance-3.onrender.com/predict",
+      {
+        method: "POST",
+        body: formData,
+      }
+    );
 
-    if (!res.ok) throw new Error("Backend error");
+    if (!res.ok) {
+      throw new Error("Backend error");
+    }
 
     const data = await res.json();
     console.log("Prediction received:", data);
-    setResult(data);     // 🎯 Show new AI result
+    setResult(data);
   } catch (err) {
     alert("❌ Unable to connect to backend");
     console.error(err);
   } finally {
-    setLoading(false);   // ✅ Hide skeleton
+    setLoading(false);
   }
 };
 
