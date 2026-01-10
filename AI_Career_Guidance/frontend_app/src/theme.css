@@ -171,3 +171,38 @@ button:hover {
   0% { background-position: -400px 0; }
   100% { background-position: 400px 0; }
 }
+/* 🌌 Glassmorphism Card */
+.glass {
+  background: rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(18px);
+  border-radius: 20px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  box-shadow: 0 20px 40px rgba(0,0,0,0.35);
+}
+
+/* ✨ Glow Effect */
+.glow {
+  box-shadow: 0 0 20px rgba(138, 180, 255, 0.6);
+}
+
+/* 🎯 Button Ripple */
+.ai-btn {
+  padding: 14px 28px;
+  border-radius: 14px;
+  background: linear-gradient(135deg, #6a5cff, #00c6ff);
+  color: white;
+  border: none;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.ai-btn:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 12px 25px rgba(106,92,255,0.45);
+}
+@media print {
+  body {
+    background: white !important;
+  }
+}

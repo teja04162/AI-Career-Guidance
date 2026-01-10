@@ -2,18 +2,54 @@ import { motion } from "framer-motion";
 import SkillGapChart from "./SkillGapChart";
 import DownloadReport from "./DownloadReport";
 import ResumeTips from "./ResumeTips";
-import AIScoreGauge from "./AIScoreGauge"; // ✅ AI Gauge
+import AIScoreGauge from "./AIScoreGauge";
+
+// 🔥 PDF utilities
+import html2canvas from "html2canvas";
+import jsPDF from "jspdf";
 
 export default function Dashboard({ result }) {
+
+  // 📄 PDF DOWNLOAD FUNCTION
+  const downloadPDF = async () => {
+    const element = document.getElementById("career-report");
+
+    const canvas = await html2canvas(element, {
+      scale: 2,
+      backgroundColor: "#ffffff",
+    });
+
+    const imgData = canvas.toDataURL("image/png");
+    const pdf = new jsPDF("p", "mm", "a4");
+
+    const pdfWidth = pdf.internal.pageSize.getWidth();
+    const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+
+    pdf.addImage(imgData, "PNG", 0, 0, pdfWidth, pdfHeight);
+    pdf.save("AI_Career_Report.pdf");
+  };
+
   return (
     <motion.div
       className="glass dashboard"
-      initial={{ opacity: 0, x: 40 }}
-      animate={{ opacity: 1, x: 0 }}
-      transition={{ duration: 0.6, ease: "easeOut" }}
+      id="career-report"   // ✅ REQUIRED FOR PDF
+      initial={{ opacity: 0, scale: 0.9, y: 30 }}
+      animate={{ opacity: 1, scale: 1, y: 0 }}
+      transition={{ duration: 0.7, ease: "easeOut" }}
       style={{ width: "380px" }}
     >
       <h2>Analysis Result</h2>
+
+      {/* 📄 DOWNLOAD BUTTON */}
+      <motion.button
+        className="ai-btn"
+        onClick={downloadPDF}
+        style={{ marginBottom: "16px" }}
+        whileHover={{ scale: 1.05 }}
+        whileTap={{ scale: 0.95 }}
+      >
+        📄 Download AI Career Report
+      </motion.button>
 
       {/* 🎯 Circular AI Score Gauge */}
       <motion.div
@@ -83,7 +119,7 @@ export default function Dashboard({ result }) {
         </motion.div>
       )}
 
-      {/* 📄 Download AI Report */}
+      {/* 📄 Optional existing download component */}
       <motion.div
         style={{ marginTop: 30 }}
         initial={{ opacity: 0, y: 15 }}
@@ -92,6 +128,7 @@ export default function Dashboard({ result }) {
       >
         <DownloadReport result={result} />
       </motion.div>
+
     </motion.div>
   );
 }
