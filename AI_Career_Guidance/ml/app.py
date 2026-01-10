@@ -2,9 +2,40 @@ from flask import Flask, request, jsonify
 from flask_cors import CORS
 import joblib
 import fitz  # PyMuPDF
+from ai_explainer import generate_explanation
+
+import sqlite3
+from datetime import datetime
 
 app = Flask(__name__)
 CORS(app)
+
+# -----------------------------
+# Initialize Analytics Database
+# -----------------------------
+def init_db():
+    conn = sqlite3.connect("analytics.db")
+    cursor = conn.cursor()
+
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS analytics (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        cgpa REAL,
+        internships INTEGER,
+        projects INTEGER,
+        certifications INTEGER,
+        probability REAL,
+        career TEXT,
+        role TEXT,
+        created_at TEXT
+    )
+    """)
+
+    conn.commit()
+    conn.close()
+
+# Create DB on server start
+init_db()
 
 # -----------------------------
 # Load ML model
@@ -94,6 +125,32 @@ def predict():
 
     tips = resume_tips(skill_score, career)
 
+    # -----------------------------
+    # Save Analytics
+    # -----------------------------
+    conn = sqlite3.connect("analytics.db")
+    cursor = conn.cursor()
+
+    cursor.execute("""
+    INSERT INTO analytics (
+        cgpa, internships, projects, certifications,
+        probability, career, role, created_at
+    )
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+    """, (
+        cgpa,
+        internships,
+        projects,
+        certifications,
+        round(prob, 2),
+        career,
+        role,
+        datetime.now().isoformat()
+    ))
+
+    conn.commit()
+    conn.close()
+
     return jsonify({
         "placement_probability": round(prob, 2),
         "career_path": career,
@@ -103,6 +160,32 @@ def predict():
         "explanation": explanation,
         "resume_tips": tips
     })
+
+# -----------------------------
+# Health Check
+# -----------------------------
 @app.route("/", methods=["GET"])
 def home():
-    return {"status": "AI Career Guidance Backend is running 🚀"}
+    return jsonify({"status": "AI Career Guidance Backend is running 🚀"})
+# -----------------------------
+# Admin Analytics API
+# -----------------------------
+@app.route("/admin/analytics", methods=["GET"])
+def admin_analytics():
+    conn = sqlite3.connect("analytics.db")
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        SELECT career, COUNT(*) as count
+        FROM analytics
+        GROUP BY career
+    """)
+
+    rows = cursor.fetchall()
+    conn.close()
+
+    return jsonify([
+        {"career": row[0], "count": row[1]}
+        for row in rows
+    ])
+
