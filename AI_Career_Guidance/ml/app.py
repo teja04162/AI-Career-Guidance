@@ -1,22 +1,32 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
-import joblib
-import fitz  # PyMuPDF
-from ai_explainer import generate_explanation
-
+from flask_jwt_extended import JWTManager, create_access_token
+import hashlib
 import sqlite3
 from datetime import datetime
+import joblib
+import fitz  # PyMuPDF
 
+from ai_explainer import generate_explanation
+
+# -----------------------------
+# App setup
+# -----------------------------
 app = Flask(__name__)
 CORS(app)
 
+# JWT config
+app.config["JWT_SECRET_KEY"] = "super-secret-key-change-this"
+jwt = JWTManager(app)
+
 # -----------------------------
-# Initialize Analytics Database
+# Initialize Database
 # -----------------------------
 def init_db():
     conn = sqlite3.connect("analytics.db")
     cursor = conn.cursor()
 
+    # Analytics table
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS analytics (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -31,10 +41,18 @@ def init_db():
     )
     """)
 
+    # Users table (AUTH)
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS users (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        email TEXT UNIQUE,
+        password TEXT
+    )
+    """)
+
     conn.commit()
     conn.close()
 
-# Create DB on server start
 init_db()
 
 # -----------------------------
@@ -73,7 +91,7 @@ def suggest_role(skills):
         return "General IT Roles"
 
 # -----------------------------
-# Resume Improvement Tips
+# Resume Tips
 # -----------------------------
 def resume_tips(skill_score, career):
     tips = []
@@ -84,16 +102,60 @@ def resume_tips(skill_score, career):
 
     if "Higher Studies" in career:
         tips.append("Highlight academic achievements and certifications.")
-        tips.append("Include research papers or competitive exam preparation.")
 
     if "Placement" in career:
         tips.append("Quantify internship impact using numbers.")
-        tips.append("Tailor resume keywords to job descriptions.")
 
     tips.append("Keep resume to 1 page with clear sections.")
-    tips.append("Use action verbs and measurable results.")
-
     return tips
+
+# -----------------------------
+# AUTH APIs
+# -----------------------------
+@app.route("/signup", methods=["POST"])
+def signup():
+    data = request.json
+    email = data["email"]
+    password = hashlib.sha256(data["password"].encode()).hexdigest()
+
+    conn = sqlite3.connect("analytics.db")
+    cursor = conn.cursor()
+
+    try:
+        cursor.execute(
+            "INSERT INTO users (email, password) VALUES (?, ?)",
+            (email, password)
+        )
+        conn.commit()
+    except sqlite3.IntegrityError:
+        return jsonify({"error": "User already exists"}), 400
+    finally:
+        conn.close()
+
+    token = create_access_token(identity=email)
+    return jsonify({"token": token})
+
+@app.route("/login", methods=["POST"])
+def login():
+    data = request.json
+    email = data["email"]
+    password = hashlib.sha256(data["password"].encode()).hexdigest()
+
+    conn = sqlite3.connect("analytics.db")
+    cursor = conn.cursor()
+
+    cursor.execute(
+        "SELECT * FROM users WHERE email=? AND password=?",
+        (email, password)
+    )
+    user = cursor.fetchone()
+    conn.close()
+
+    if not user:
+        return jsonify({"error": "Invalid credentials"}), 401
+
+    token = create_access_token(identity=email)
+    return jsonify({"token": token})
 
 # -----------------------------
 # Prediction API
@@ -118,36 +180,26 @@ def predict():
         explanation = "Strong academic profile with relevant skills."
     elif prob >= 45:
         career = "Skill Improvement + Internships"
-        explanation = "Good foundation but needs more hands-on experience."
+        explanation = "Good foundation but needs more experience."
     else:
         career = "Higher Studies / Govt Exams"
-        explanation = "Focus on fundamentals and long-term preparation."
+        explanation = "Focus on fundamentals."
 
     tips = resume_tips(skill_score, career)
 
-    # -----------------------------
-    # Save Analytics
-    # -----------------------------
     conn = sqlite3.connect("analytics.db")
     cursor = conn.cursor()
-
     cursor.execute("""
-    INSERT INTO analytics (
-        cgpa, internships, projects, certifications,
-        probability, career, role, created_at
-    )
-    VALUES (?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO analytics (
+            cgpa, internships, projects, certifications,
+            probability, career, role, created_at
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?)
     """, (
-        cgpa,
-        internships,
-        projects,
-        certifications,
-        round(prob, 2),
-        career,
-        role,
+        cgpa, internships, projects, certifications,
+        round(prob, 2), career, role,
         datetime.now().isoformat()
     ))
-
     conn.commit()
     conn.close()
 
@@ -162,30 +214,28 @@ def predict():
     })
 
 # -----------------------------
-# Health Check
-# -----------------------------
-@app.route("/", methods=["GET"])
-def home():
-    return jsonify({"status": "AI Career Guidance Backend is running 🚀"})
-# -----------------------------
-# Admin Analytics API
+# Admin Analytics
 # -----------------------------
 @app.route("/admin/analytics", methods=["GET"])
 def admin_analytics():
     conn = sqlite3.connect("analytics.db")
     cursor = conn.cursor()
-
     cursor.execute("""
-        SELECT career, COUNT(*) as count
-        FROM analytics
-        GROUP BY career
+        SELECT career, COUNT(*) FROM analytics GROUP BY career
     """)
-
     rows = cursor.fetchall()
     conn.close()
 
     return jsonify([
-        {"career": row[0], "count": row[1]}
-        for row in rows
+        {"career": r[0], "count": r[1]} for r in rows
     ])
 
+# -----------------------------
+# Health Check
+# -----------------------------
+@app.route("/")
+def home():
+    return jsonify({"status": "AI Career Guidance Backend is running 🚀"})
+
+if __name__ == "__main__":
+    app.run(debug=True)
