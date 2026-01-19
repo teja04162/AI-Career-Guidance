@@ -7,15 +7,13 @@ from datetime import datetime
 import joblib
 import fitz  # PyMuPDF
 
-from ai_explainer import generate_explanation
-
 # -----------------------------
-# App setup
+# App Setup
 # -----------------------------
 app = Flask(__name__)
 CORS(app)
 
-# JWT config
+# JWT Config
 app.config["JWT_SECRET_KEY"] = "super-secret-key-change-this"
 jwt = JWTManager(app)
 
@@ -41,7 +39,7 @@ def init_db():
     )
     """)
 
-    # Users table (AUTH)
+    # Users table
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS users (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -56,7 +54,7 @@ def init_db():
 init_db()
 
 # -----------------------------
-# Load ML model
+# Load ML Model
 # -----------------------------
 model = joblib.load("model.pkl")
 
@@ -114,7 +112,11 @@ def resume_tips(skill_score, career):
 # -----------------------------
 @app.route("/signup", methods=["POST"])
 def signup():
-    data = request.json
+    data = request.get_json(silent=True)
+
+    if not data or "email" not in data or "password" not in data:
+        return jsonify({"error": "Email and password required"}), 400
+
     email = data["email"]
     password = hashlib.sha256(data["password"].encode()).hexdigest()
 
@@ -135,9 +137,14 @@ def signup():
     token = create_access_token(identity=email)
     return jsonify({"token": token})
 
+
 @app.route("/login", methods=["POST"])
 def login():
-    data = request.json
+    data = request.get_json(silent=True)
+
+    if not data or "email" not in data or "password" not in data:
+        return jsonify({"error": "Email and password required"}), 400
+
     email = data["email"]
     password = hashlib.sha256(data["password"].encode()).hexdigest()
 
@@ -162,12 +169,17 @@ def login():
 # -----------------------------
 @app.route("/predict", methods=["POST"])
 def predict():
-    resume = request.files["resume"]
+    if "resume" not in request.files:
+        return jsonify({"error": "Resume file is required"}), 400
 
-    cgpa = float(request.form["cgpa"])
-    internships = int(request.form["internships"])
-    projects = int(request.form["projects"])
-    certifications = int(request.form["certifications"])
+    try:
+        resume = request.files["resume"]
+        cgpa = float(request.form.get("cgpa", 0))
+        internships = int(request.form.get("internships", 0))
+        projects = int(request.form.get("projects", 0))
+        certifications = int(request.form.get("certifications", 0))
+    except Exception as e:
+        return jsonify({"error": str(e)}), 400
 
     resume_skills, skill_score = extract_skills(resume)
     role = suggest_role(resume_skills)
@@ -196,8 +208,13 @@ def predict():
         )
         VALUES (?, ?, ?, ?, ?, ?, ?)
     """, (
-        cgpa, internships, projects, certifications,
-        round(prob, 2), career, role,
+        cgpa,
+        internships,
+        projects,
+        certifications,
+        round(prob, 2),
+        career,
+        role,
         datetime.now().isoformat()
     ))
     conn.commit()
