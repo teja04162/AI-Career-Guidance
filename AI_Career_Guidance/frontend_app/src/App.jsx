@@ -5,15 +5,14 @@ import Dashboard from "./components/Dashboard";
 import "./styles/theme.css";
 import LoadingSkeleton from "./components/LoadingSkeleton";
 import Auth from "./components/Auth";
+import api from "./services/api";
 
 function App() {
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
 
-  // 🔐 AUTH STATE
-  const [authenticated, setAuthenticated] = useState(
-    !!localStorage.getItem("token")
-  );
+  // 🔐 AUTH STATE (FORCE LOGIN EVERY TIME)
+  const [authenticated, setAuthenticated] = useState(false);
 
   // 🚀 AI ANALYSIS
   const analyzeCareer = async (formData) => {
@@ -21,24 +20,15 @@ function App() {
       setResult(null);
       setLoading(true);
 
-      const res = await fetch(
-        "https://ai-career-guidance-3.onrender.com/predict",
-        {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
-          },
-          body: formData,
-        }
-      );
+      const response = await api.post("/predict", formData, {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+      });
 
-      if (!res.ok) {
-        throw new Error("Backend error");
-      }
+      console.log("Prediction received:", response.data);
+      setResult(response.data);
 
-      const data = await res.json();
-      console.log("Prediction received:", data);
-      setResult(data);
     } catch (err) {
       alert("❌ Unable to connect to backend");
       console.error(err);
@@ -47,11 +37,9 @@ function App() {
     }
   };
 
-  // 🔒 BLOCK AI UNTIL LOGIN
+  // 🔒 ALWAYS SHOW LOGIN FIRST
   if (!authenticated) {
-    return (
-      <Auth onAuthSuccess={() => setAuthenticated(true)} />
-    );
+    return <Auth onAuthSuccess={() => setAuthenticated(true)} />;
   }
 
   return (
@@ -72,10 +60,8 @@ function App() {
       >
         <UploadCard onAnalyze={analyzeCareer} loading={loading} />
 
-        {/* 🔄 AI Loading Skeleton with Glow */}
         {loading && (
           <motion.div
-            key="skeleton"
             className="glass glow"
             animate={{
               boxShadow: [
@@ -93,10 +79,8 @@ function App() {
           </motion.div>
         )}
 
-        {/* 📊 Dashboard with Smooth Scale + Slide */}
         {result && !loading && (
           <motion.div
-            key="dashboard"
             className="glass"
             initial={{ opacity: 0, scale: 0.9, y: 30 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
