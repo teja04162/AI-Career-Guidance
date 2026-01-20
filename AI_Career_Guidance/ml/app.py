@@ -255,4 +255,4 @@ def home():
     return jsonify({"status": "AI Career Guidance Backend is running 🚀"})
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    app.run()
